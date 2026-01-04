@@ -11,7 +11,7 @@ A Docker-based sandbox for running Claude Code CLI in isolation from your host s
 ## Installation
 
 ```bash
-git clone <repo-url>
+git clone https://github.com/todd-working/claude-code-container.git
 cd claude-code-container
 make install
 source ~/.zshrc
