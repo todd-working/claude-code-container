@@ -12,7 +12,14 @@ RUN apt-get update && apt-get install -y \
     python3-pip \
     nodejs \
     npm \
-    && rm -rf /var/lib/apt/lists/*
+    ncurses-base \
+    locales \
+    && rm -rf /var/lib/apt/lists/* \
+    && locale-gen en_US.UTF-8
+
+# Set terminal environment
+ENV TERM=xterm-256color
+ENV LANG=en_US.UTF-8
 
 # Install Claude Code CLI globally
 RUN npm install -g @anthropic-ai/claude-code
@@ -27,4 +34,5 @@ WORKDIR /home/claude/workspace
 USER claude
 
 # Launch Claude Code with full permissions (safe since container is isolated)
-CMD ["claude", "--dangerously-skip-permissions"]
+# Using script to force proper PTY allocation for interactive menus
+CMD ["script", "-q", "-c", "claude --dangerously-skip-permissions", "/dev/null"]
