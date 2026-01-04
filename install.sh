@@ -6,6 +6,7 @@ claude-sandbox() {
     local project_name="$(basename "$project_path")"
     docker run -it --rm \
         --name "claude-$project_name" \
+        -e TERM=xterm-256color \
         -v "$project_path":/home/claude/workspace \
         claude-sandbox
 }'
