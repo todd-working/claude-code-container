@@ -43,7 +43,7 @@ claude-sandbox() {
         -e TERM=xterm-256color \
         -v claude-auth:/home/claude/.claude \
         -v "$project_path":/home/claude/workspace \
-        $extra_volumes \
+        ${=extra_volumes} \
         "$image"
 }
 

@@ -49,7 +49,7 @@ seed-auth:
 	@docker run --rm \
 		-v "$(HOME)/.claude":/source:ro \
 		-v claude-auth:/dest \
-		alpine sh -c "rm -rf /dest/* && cp -r /source/. /dest/"
+		alpine sh -c "rm -rf /dest/* && cp -r /source/. /dest/ && chown -R 1000:1000 /dest"
 	@echo "Done. Auth credentials copied to claude-auth volume."
 
 update-claude:

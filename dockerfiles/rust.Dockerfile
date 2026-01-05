@@ -73,6 +73,61 @@ Flamegraph is not pre-installed. When profiling is needed:
    ```bash
    cargo flamegraph --bin <binary_name>
    ```
+
+## Makefile.local Template
+
+For building on the host Mac, create a `Makefile.local` with this template:
+
+```makefile
+# Makefile.local - Host Mac build targets
+# Generated for Rust project
+
+.PHONY: check-deps install-deps build-mac build-release run clean
+
+# Check for required tools
+check-deps:
+	@echo "Checking dependencies..."
+	@command -v rustc >/dev/null || { echo "❌ Rust not found. Run: brew install rustup && rustup-init"; exit 1; }
+	@command -v cargo >/dev/null || { echo "❌ Cargo not found. Run: rustup-init"; exit 1; }
+	@echo "✓ Rust $$(rustc --version | cut -d' ' -f2)"
+	@echo "✓ Cargo $$(cargo --version | cut -d' ' -f2)"
+	@echo "All dependencies satisfied."
+
+# Install missing dependencies (macOS with Homebrew)
+install-deps:
+	@command -v brew >/dev/null || { echo "Homebrew required: https://brew.sh"; exit 1; }
+	@command -v rustup >/dev/null || { brew install rustup && rustup-init -y; }
+	@echo "Dependencies installed."
+
+# Build debug binary for macOS
+build-mac: check-deps
+	@echo "Building debug binary..."
+	cargo build
+	@echo "Built: target/debug/"
+
+# Build optimized release binary for macOS
+build-release: check-deps
+	@echo "Building release binary..."
+	cargo build --release
+	@echo "Built: target/release/"
+
+# Run the application
+run: build-mac
+	cargo run
+
+# Run tests
+test:
+	cargo test
+
+# Run clippy lints
+lint:
+	cargo clippy -- -D warnings
+
+clean:
+	cargo clean
+```
+
+Copy this to your project and customize as needed.
 EOF
 
 WORKDIR /home/claude/workspace
