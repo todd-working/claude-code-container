@@ -26,7 +26,7 @@ USER claude
 # Create go directories
 RUN mkdir -p /home/claude/go/bin /home/claude/go/pkg
 
-# Create CLAUDE.md with cross-compilation notes
+# Create CLAUDE.md with cross-compilation notes and Makefile template
 RUN cat > /home/claude/.claude/CLAUDE.md << 'EOF'
 # Go Development Environment
 
@@ -49,6 +49,47 @@ CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -o myapp
 ```
 
 Most pure Go projects work fine with CGO disabled.
+
+## Makefile.local Template
+
+For building on the host Mac, create a `Makefile.local` with this template:
+
+```makefile
+# Makefile.local - Host Mac build targets
+# Generated for Go project
+
+.PHONY: check-deps install-deps build-mac clean
+
+# Check for required tools
+check-deps:
+	@echo "Checking dependencies..."
+	@command -v go >/dev/null || { echo "❌ Go not found. Run: brew install go"; exit 1; }
+	@echo "✓ Go $$(go version | cut -d' ' -f3)"
+	@echo "All dependencies satisfied."
+
+# Install missing dependencies (macOS with Homebrew)
+install-deps:
+	@command -v brew >/dev/null || { echo "Homebrew required: https://brew.sh"; exit 1; }
+	@command -v go >/dev/null || brew install go
+	@echo "Dependencies installed."
+
+# Build for macOS (Apple Silicon)
+build-mac: check-deps
+	@echo "Building for macOS arm64..."
+	CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -o bin/$(notdir $(CURDIR))
+	@echo "Built: bin/$(notdir $(CURDIR))"
+
+# Build for macOS (Intel)
+build-mac-intel: check-deps
+	@echo "Building for macOS amd64..."
+	CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -o bin/$(notdir $(CURDIR))-amd64
+	@echo "Built: bin/$(notdir $(CURDIR))-amd64"
+
+clean:
+	rm -rf bin/
+```
+
+Copy this to your project and customize the binary name as needed.
 EOF
 
 # Install Go tools
