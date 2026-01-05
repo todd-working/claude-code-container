@@ -31,7 +31,80 @@ RUN uv tool install ruff \
     && uv tool install pytest \
     && uv tool install ipython
 
-# Note: py-spy requires sudo/root for some operations, install on-demand if needed
+# Container-specific CLAUDE.md (copied to workspace/.claude/ on startup by base entrypoint)
+USER root
+RUN cat > /opt/claude-container/CLAUDE.md << 'EOF'
+# Container Environment: Python
 
-WORKDIR /home/claude/workspace
-CMD ["script", "-q", "-c", "claude --dangerously-skip-permissions", "/dev/null"]
+## Available Tools
+
+- **uv** - Fast Python package manager (use instead of pip)
+- **ruff** - Linter and formatter
+- **mypy** - Type checker
+- **pytest** - Test runner
+- **ipython** - Interactive Python shell
+
+## Virtual Environments
+
+Create a virtual environment for your project:
+
+```bash
+uv venv
+source .venv/bin/activate
+uv pip install -r requirements.txt
+```
+
+## Running on Host Mac
+
+Python code runs the same in the container and on Mac. For dependencies that require compilation (numpy, etc.), you may need to rebuild on the Mac:
+
+```bash
+# On Mac:
+uv venv
+source .venv/bin/activate
+uv pip install -r requirements.txt
+```
+
+## Makefile.local Template
+
+For convenience on the host Mac, create a `Makefile.local`:
+
+```makefile
+# Makefile.local - Host Mac targets
+# Generated for Python project
+
+.PHONY: check-deps install-deps venv test lint clean
+
+# Check for required tools
+check-deps:
+	@echo "Checking dependencies..."
+	@command -v python3 >/dev/null || { echo "❌ Python not found. Run: brew install python@3.12"; exit 1; }
+	@command -v uv >/dev/null || { echo "❌ uv not found. Run: brew install uv"; exit 1; }
+	@echo "✓ Python $$(python3 --version | cut -d' ' -f2)"
+	@echo "✓ uv $$(uv --version | cut -d' ' -f2)"
+	@echo "All dependencies satisfied."
+
+# Install missing dependencies (macOS with Homebrew)
+install-deps:
+	@command -v brew >/dev/null || { echo "Homebrew required: https://brew.sh"; exit 1; }
+	@command -v python3 >/dev/null || brew install python@3.12
+	@command -v uv >/dev/null || brew install uv
+	@echo "Dependencies installed."
+
+# Create virtual environment and install dependencies
+venv: check-deps
+	uv venv
+	. .venv/bin/activate && uv pip install -r requirements.txt
+
+# Run tests
+test:
+	. .venv/bin/activate && pytest
+
+# Run linter
+lint:
+	. .venv/bin/activate && ruff check .
+
+clean:
+	rm -rf .venv __pycache__ .pytest_cache .mypy_cache .ruff_cache
+```
+EOF

@@ -23,27 +23,8 @@ USER claude
 # Create go directories
 RUN mkdir -p /home/claude/go/bin /home/claude/go/pkg
 
-# Store container CLAUDE.md in /opt (will be copied to workspace on startup)
+# Container-specific CLAUDE.md (copied to workspace/.claude/ on startup by base entrypoint)
 USER root
-RUN mkdir -p /opt/claude-container
-COPY --chmod=755 <<'SCRIPT' /opt/claude-container/entrypoint.sh
-#!/bin/bash
-# Copy container CLAUDE.md to workspace if .claude dir exists or create it
-if [ -f /opt/claude-container/CLAUDE.md ]; then
-    mkdir -p /home/claude/workspace/.claude
-    if [ -f /home/claude/workspace/.claude/CLAUDE.md ]; then
-        # Append if not already present
-        if ! grep -q "# Container Environment" /home/claude/workspace/.claude/CLAUDE.md 2>/dev/null; then
-            echo "" >> /home/claude/workspace/.claude/CLAUDE.md
-            cat /opt/claude-container/CLAUDE.md >> /home/claude/workspace/.claude/CLAUDE.md
-        fi
-    else
-        cp /opt/claude-container/CLAUDE.md /home/claude/workspace/.claude/CLAUDE.md
-    fi
-fi
-exec "$@"
-SCRIPT
-
 RUN cat > /opt/claude-container/CLAUDE.md << 'EOF'
 # Container Environment: Go
 
@@ -108,14 +89,10 @@ clean:
 
 Copy this to your project and customize the binary name as needed.
 EOF
-USER claude
 
 # Install Go tools
+USER claude
 RUN go install golang.org/x/tools/gopls@latest \
     && go install github.com/go-delve/delve/cmd/dlv@latest \
     && go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest \
     && go install mvdan.cc/gofumpt@latest
-
-WORKDIR /home/claude/workspace
-ENTRYPOINT ["/opt/claude-container/entrypoint.sh"]
-CMD ["script", "-q", "-c", "claude --dangerously-skip-permissions", "/dev/null"]
