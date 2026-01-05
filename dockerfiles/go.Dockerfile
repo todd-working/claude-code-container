@@ -18,17 +18,15 @@ ENV PATH="/usr/local/go/bin:/home/claude/go/bin:${PATH}"
 ENV GOPATH=/home/claude/go
 ENV GOBIN=/home/claude/go/bin
 
-# Create .claude directory for CLAUDE.md
-RUN mkdir -p /home/claude/.claude && chown claude:claude /home/claude/.claude
-
 USER claude
 
 # Create go directories
 RUN mkdir -p /home/claude/go/bin /home/claude/go/pkg
 
-# Create CLAUDE.md with cross-compilation notes and Makefile template
-RUN cat > /home/claude/.claude/CLAUDE.md << 'EOF'
-# Go Development Environment
+# Container-specific CLAUDE.md (copied to workspace/.claude/ on startup by base entrypoint)
+USER root
+RUN cat > /opt/claude-container/CLAUDE.md << 'EOF'
+# Container Environment: Go
 
 ## Cross-Compiling for macOS
 
@@ -93,10 +91,8 @@ Copy this to your project and customize the binary name as needed.
 EOF
 
 # Install Go tools
+USER claude
 RUN go install golang.org/x/tools/gopls@latest \
     && go install github.com/go-delve/delve/cmd/dlv@latest \
     && go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest \
     && go install mvdan.cc/gofumpt@latest
-
-WORKDIR /home/claude/workspace
-CMD ["script", "-q", "-c", "claude --dangerously-skip-permissions", "/dev/null"]

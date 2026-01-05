@@ -9,9 +9,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     lldb \
     && rm -rf /var/lib/apt/lists/*
 
-# Create .claude directory for CLAUDE.md
-RUN mkdir -p /home/claude/.claude && chown claude:claude /home/claude/.claude
-
 USER claude
 
 # Install Rust via rustup
@@ -26,9 +23,10 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
 RUN rustup component add clippy rustfmt rust-analyzer \
     && cargo install cargo-watch cargo-edit
 
-# Create CLAUDE.md with build and profiling instructions
-RUN cat > /home/claude/.claude/CLAUDE.md << 'EOF'
-# Rust Development Environment
+# Container-specific CLAUDE.md (copied to workspace/.claude/ on startup by base entrypoint)
+USER root
+RUN cat > /opt/claude-container/CLAUDE.md << 'EOF'
+# Container Environment: Rust
 
 ## Building for macOS
 
@@ -129,6 +127,3 @@ clean:
 
 Copy this to your project and customize as needed.
 EOF
-
-WORKDIR /home/claude/workspace
-CMD ["script", "-q", "-c", "claude --dangerously-skip-permissions", "/dev/null"]

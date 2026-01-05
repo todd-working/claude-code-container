@@ -37,8 +37,29 @@ RUN npm install -g @anthropic-ai/claude-code
 RUN userdel -r ubuntu 2>/dev/null || true \
     && useradd -m -s /bin/bash -u 1000 claude
 
+# Create entrypoint script that copies container CLAUDE.md to workspace
+RUN mkdir -p /opt/claude-container
+COPY --chmod=755 <<'SCRIPT' /opt/claude-container/entrypoint.sh
+#!/bin/bash
+# Copy container CLAUDE.md to workspace/.claude/ on startup
+MARKER="/home/claude/workspace/.claude/.container-initialized"
+if [ -f /opt/claude-container/CLAUDE.md ] && [ ! -f "$MARKER" ]; then
+    mkdir -p /home/claude/workspace/.claude
+    if [ -f /home/claude/workspace/.claude/CLAUDE.md ]; then
+        # Append to existing CLAUDE.md
+        echo "" >> /home/claude/workspace/.claude/CLAUDE.md
+        cat /opt/claude-container/CLAUDE.md >> /home/claude/workspace/.claude/CLAUDE.md
+    else
+        cp /opt/claude-container/CLAUDE.md /home/claude/workspace/.claude/CLAUDE.md
+    fi
+    touch "$MARKER"
+fi
+exec "$@"
+SCRIPT
+
 WORKDIR /home/claude/workspace
 USER claude
 
+ENTRYPOINT ["/opt/claude-container/entrypoint.sh"]
 # Launch Claude Code with full permissions (safe since container is isolated)
 CMD ["script", "-q", "-c", "claude --dangerously-skip-permissions", "/dev/null"]

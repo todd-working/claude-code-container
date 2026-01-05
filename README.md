@@ -133,6 +133,22 @@ This removes all Docker images and volumes. Manually remove the shell functions 
 - **Ephemeral containers**: The `--rm` flag ensures containers are destroyed on exit
 - **`--dangerously-skip-permissions`**: Safe here because the container provides the isolation boundary
 
+## Project-Level Instructions
+
+On first run, each language container creates a `.claude/CLAUDE.md` in your project with container-specific instructions (cross-compilation, Makefile templates, etc.). This helps Claude Code understand the container environment.
+
+If you don't want this tracked in git, add to your `.gitignore`:
+
+```
+.claude/
+```
+
+Or to keep your own CLAUDE.md but ignore the container marker:
+
+```
+.claude/.container-initialized
+```
+
 ## What's Installed
 
 ### Base Image
