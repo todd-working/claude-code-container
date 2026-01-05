@@ -18,8 +18,6 @@ ENV PATH="/usr/local/go/bin:/home/claude/go/bin:${PATH}"
 ENV GOPATH=/home/claude/go
 ENV GOBIN=/home/claude/go/bin
 
-USER root
-
 # Create .claude directory for CLAUDE.md
 RUN mkdir -p /home/claude/.claude && chown claude:claude /home/claude/.claude
 

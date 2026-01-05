@@ -1,6 +1,6 @@
 #!/bin/bash
 
-SHELL_FUNCTION='# Claude Code sandbox functions
+SHELL_FUNCTION='# BEGIN Claude Code sandbox functions
 claude-sandbox() {
     local lang="${1:-base}"
     local project_path="${2:-$(pwd)}"
@@ -63,7 +63,8 @@ claude-sandbox-rust-profile() {
         -v claude-cargo-bin:/home/claude/.cargo/bin \
         -v "$project_path":/home/claude/workspace \
         claude-sandbox-rust
-}'
+}
+# END Claude Code sandbox functions'
 
 RC_FILE="$HOME/.zshrc"
 
@@ -71,12 +72,15 @@ RC_FILE="$HOME/.zshrc"
 remove_old_functions() {
     if grep -q "claude-sandbox()" "$RC_FILE" 2>/dev/null; then
         echo "Removing old claude-sandbox functions from $RC_FILE..."
-        # Create temp file without the old functions
-        # Remove from "# Claude Code sandbox" comment through the closing brace of last function
-        sed -i.bak '/# Claude Code sandbox/,/^}$/d' "$RC_FILE"
-        # Also remove any standalone claude-sandbox-rust-profile if it exists separately
-        sed -i.bak '/claude-sandbox-rust-profile()/,/^}$/d' "$RC_FILE"
-        # Clean up empty lines left behind
+        # Try new marker-based removal first (robust)
+        if grep -q "# BEGIN Claude Code sandbox" "$RC_FILE" 2>/dev/null; then
+            sed -i.bak '/# BEGIN Claude Code sandbox/,/# END Claude Code sandbox/d' "$RC_FILE"
+        else
+            # Fallback for old installations without markers
+            sed -i.bak '/# Claude Code sandbox/,/^}$/d' "$RC_FILE"
+            sed -i.bak '/claude-sandbox-rust-profile()/,/^}$/d' "$RC_FILE"
+        fi
+        # Clean up consecutive empty lines
         sed -i.bak '/^$/N;/^\n$/d' "$RC_FILE"
         rm -f "$RC_FILE.bak"
         echo "Old functions removed."

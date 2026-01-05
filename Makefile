@@ -69,7 +69,7 @@ update-python: update-claude
 	@echo "Rebuilding Python image with latest tools..."
 	docker build --no-cache -t $(PYTHON_IMAGE) -f dockerfiles/python.Dockerfile .
 
-update-all: update-claude update-go update-rust update-python
+update-all: update-go update-rust update-python
 	@echo "All images rebuilt with latest versions."
 
 uninstall:
