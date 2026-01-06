@@ -127,3 +127,5 @@ clean:
 
 Copy this to your project and customize as needed.
 EOF
+
+USER claude
