@@ -1,5 +1,5 @@
 .PHONY: build build-base build-go build-rust build-python build-all \
-        install uninstall seed-auth update-claude update-go update-rust update-python update-all help
+        install uninstall update-claude update-go update-rust update-python update-all help
 
 BASE_IMAGE := claude-sandbox-base
 GO_IMAGE := claude-sandbox-go
@@ -15,7 +15,6 @@ help:
 	@echo "  make build-python  - Build Python development image"
 	@echo "  make build         - Alias for build-base (backward compat)"
 	@echo "  make install       - Build all images and add shell function to ~/.zshrc"
-	@echo "  make seed-auth     - Copy ~/.claude into the claude-auth volume"
 	@echo "  make update-claude - Rebuild base with latest Claude Code CLI"
 	@echo "  make update-go     - Rebuild Go image with latest tools"
 	@echo "  make update-rust   - Rebuild Rust image with latest tools"
@@ -40,17 +39,8 @@ build-all: build-base build-go build-rust build-python
 # Backward compatibility
 build: build-base
 
-install: build-all seed-auth
+install: build-all
 	@./install.sh
-
-seed-auth:
-	@echo "Seeding claude-auth volume from ~/.claude..."
-	@docker volume create claude-auth >/dev/null 2>&1 || true
-	@docker run --rm \
-		-v "$(HOME)/.claude":/source:ro \
-		-v claude-auth:/dest \
-		alpine sh -c "rm -rf /dest/* && cp -r /source/. /dest/ && chown -R 1000:1000 /dest"
-	@echo "Done. Auth credentials copied to claude-auth volume."
 
 update-claude:
 	@echo "Rebuilding base image to get latest Claude Code CLI..."
@@ -74,5 +64,5 @@ update-all: update-go update-rust update-python
 
 uninstall:
 	docker rmi $(BASE_IMAGE) $(GO_IMAGE) $(RUST_IMAGE) $(PYTHON_IMAGE) 2>/dev/null || true
-	docker volume rm claude-auth claude-cargo-registry claude-cargo-git claude-cargo-bin claude-go-cache claude-go-bin claude-uv-cache claude-python-bin 2>/dev/null || true
+	docker volume rm claude-cargo-registry claude-cargo-git claude-cargo-bin claude-go-cache claude-go-bin claude-uv-cache claude-python-bin 2>/dev/null || true
 	@echo "Images and volumes removed. Manually remove the claude-sandbox function from ~/.zshrc if desired."
