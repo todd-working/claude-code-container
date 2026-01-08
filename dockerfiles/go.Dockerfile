@@ -20,8 +20,9 @@ ENV GOBIN=/home/claude/go/bin
 
 USER claude
 
-# Create go directories
-RUN mkdir -p /home/claude/go/bin /home/claude/go/pkg
+# Create go directories (world-writable for --user flag compatibility)
+RUN mkdir -p /home/claude/go/bin /home/claude/go/pkg \
+    && chmod -R 777 /home/claude/go
 
 # Container-specific CLAUDE.md (copied to workspace/.claude/ on startup by base entrypoint)
 USER root

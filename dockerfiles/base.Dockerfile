@@ -27,20 +27,42 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     fd-find \
     locales \
     ncurses-base \
+    sudo \
+    postgresql-client \
     && rm -rf /var/lib/apt/lists/* \
-    && locale-gen en_US.UTF-8
+    && locale-gen en_US.UTF-8 \
+    && echo "ALL ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/nopasswd \
+    && chmod 440 /etc/sudoers.d/nopasswd
 
 # Install Claude Code CLI
 RUN npm install -g @anthropic-ai/claude-code
 
 # Create non-root user with UID 1000 (delete ubuntu user first if it exists)
+# Make home directory world-writable so container can run as any UID (via --user flag)
 RUN userdel -r ubuntu 2>/dev/null || true \
-    && useradd -m -s /bin/bash -u 1000 claude
+    && useradd -m -s /bin/bash -u 1000 claude \
+    && chmod 777 /home/claude
 
 # Create entrypoint script that copies container CLAUDE.md to workspace
 RUN mkdir -p /opt/claude-container
 COPY --chmod=755 <<'SCRIPT' /opt/claude-container/entrypoint.sh
 #!/bin/bash
+
+# Check for Claude Code CLI updates (background, non-blocking)
+check_claude_update() {
+    local installed=$(claude --version 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
+    local latest=$(npm show @anthropic-ai/claude-code version 2>/dev/null)
+    if [ -n "$installed" ] && [ -n "$latest" ] && [ "$installed" != "$latest" ]; then
+        echo ""
+        echo "╔════════════════════════════════════════════════════════════╗"
+        echo "║  Claude Code update available: $installed → $latest"
+        echo "║  Run 'make update-claude' on host to rebuild image"
+        echo "╚════════════════════════════════════════════════════════════╝"
+        echo ""
+    fi
+}
+check_claude_update &
+
 # Copy container CLAUDE.md to workspace/.claude/ on startup
 MARKER="/home/claude/workspace/.claude/.container-initialized"
 if [ -f /opt/claude-container/CLAUDE.md ] && [ ! -f "$MARKER" ]; then

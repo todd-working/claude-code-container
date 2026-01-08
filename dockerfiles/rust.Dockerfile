@@ -21,7 +21,8 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
 
 # Add components and tools
 RUN rustup component add clippy rustfmt rust-analyzer \
-    && cargo install cargo-watch cargo-edit
+    && cargo install cargo-watch cargo-edit \
+    && chmod -R 777 /home/claude/.cargo /home/claude/.rustup
 
 # Container-specific CLAUDE.md (copied to workspace/.claude/ on startup by base entrypoint)
 USER root
@@ -64,8 +65,7 @@ Flamegraph is not pre-installed. When profiling is needed:
 
 2. **Important**: This container needs profiling capabilities. Tell the user to:
    - Exit the current container
-   - Restart with: `claude-sandbox-rust-profile [project_path]`
-   - Or add flags: `--cap-add=SYS_PTRACE --security-opt seccomp=unconfined`
+   - Restart with: `claude-sandbox rust [project_path] --profile`
 
 3. Run the profiler:
    ```bash

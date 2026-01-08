@@ -2,18 +2,39 @@
 
 SHELL_FUNCTION='# BEGIN Claude Code sandbox functions
 claude-sandbox() {
-    local lang="${1:-base}"
-    local project_path="${2:-$(pwd)}"
+    local lang="base"
+    local project_path="$(pwd)"
+    local profile_mode=false
 
-    # If only one arg and it looks like a path, treat as base + path
-    if [[ $# -eq 1 && -d "$1" ]]; then
-        lang="base"
-        project_path="$1"
-    fi
+    # Parse arguments
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --profile)
+                profile_mode=true
+                shift
+                ;;
+            go|rust|python|py|base)
+                lang="$1"
+                shift
+                ;;
+            *)
+                if [[ -d "$1" ]]; then
+                    project_path="$1"
+                else
+                    echo "Unknown argument: $1"
+                    echo "Usage: claude-sandbox [go|rust|python|base] [project_path] [--profile]"
+                    return 1
+                fi
+                shift
+                ;;
+        esac
+    done
 
     local project_name="$(basename "$project_path")"
     local image="claude-sandbox-base"
     local extra_volumes=""
+    local extra_flags=""
+    local network_flag=""
 
     case "$lang" in
         go)
@@ -23,6 +44,10 @@ claude-sandbox() {
         rust)
             image="claude-sandbox-rust"
             extra_volumes="-v claude-cargo-registry:/home/claude/.cargo/registry -v claude-cargo-git:/home/claude/.cargo/git -v claude-cargo-bin:/home/claude/.cargo/bin"
+            if $profile_mode; then
+                extra_flags="--cap-add=SYS_PTRACE --security-opt seccomp=unconfined"
+                echo "Profiling mode enabled (SYS_PTRACE + seccomp=unconfined)"
+            fi
             ;;
         python|py)
             image="claude-sandbox-python"
@@ -31,38 +56,42 @@ claude-sandbox() {
         base)
             image="claude-sandbox-base"
             ;;
-        *)
-            echo "Unknown language: $lang"
-            echo "Usage: claude-sandbox [go|rust|python|base] [project_path]"
-            return 1
-            ;;
     esac
 
+    # Warn if --profile used with non-Rust
+    if $profile_mode && [[ "$lang" != "rust" ]]; then
+        echo "Warning: --profile only affects Rust containers (ignored)"
+    fi
+
+    # List available Docker networks and ask if user wants to join one
+    local networks=($(docker network ls --format "{{.Name}}" | grep -vE "^(bridge|host|none)$"))
+    if [[ ${#networks[@]} -gt 0 ]]; then
+        echo "Available Docker networks:"
+        echo "  0) None (default)"
+        local i=1
+        for net in "${networks[@]}"; do
+            echo "  $i) $net"
+            ((i++))
+        done
+        echo -n "Join a network? [0-$((i-1))]: "
+        read -r choice
+        if [[ "$choice" =~ ^[1-9][0-9]*$ ]] && [[ $choice -le ${#networks[@]} ]]; then
+            local selected_network="${networks[$((choice-1))]}"
+            network_flag="--network $selected_network"
+            echo "Joining network: $selected_network"
+        fi
+    fi
+
     docker run -it --rm \
+        --user "$(id -u):$(id -g)" \
         --name "claude-$project_name" \
         -e TERM=xterm-256color \
-        -v claude-auth:/home/claude/.claude \
+        $network_flag \
+        $extra_flags \
+        -v "$HOME/.claude":/home/claude/.claude \
         -v "$project_path":/home/claude/workspace \
         ${=extra_volumes} \
         "$image"
-}
-
-# Rust profiling variant with capabilities for flamegraph
-claude-sandbox-rust-profile() {
-    local project_path="${1:-$(pwd)}"
-    local project_name="$(basename "$project_path")"
-
-    docker run -it --rm \
-        --name "claude-$project_name" \
-        -e TERM=xterm-256color \
-        --cap-add=SYS_PTRACE \
-        --security-opt seccomp=unconfined \
-        -v claude-auth:/home/claude/.claude \
-        -v claude-cargo-registry:/home/claude/.cargo/registry \
-        -v claude-cargo-git:/home/claude/.cargo/git \
-        -v claude-cargo-bin:/home/claude/.cargo/bin \
-        -v "$project_path":/home/claude/workspace \
-        claude-sandbox-rust
 }
 # END Claude Code sandbox functions'
 

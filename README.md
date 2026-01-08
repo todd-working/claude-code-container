@@ -29,8 +29,9 @@ source ~/.zshrc
 
 This will:
 1. Build all Docker images (base + language variants)
-2. Copy your `~/.claude` credentials into a persistent Docker volume
-3. Add the `claude-sandbox` shell function to your `~/.zshrc`
+2. Add the `claude-sandbox` shell function to your `~/.zshrc`
+
+Your `~/.claude` directory is mounted directly into the container, so authentication and settings sync bidirectionally between host and container.
 
 ## Usage
 
@@ -53,10 +54,10 @@ claude-sandbox
 
 ### Rust Profiling
 
-For profiling Rust code with `flamegraph`, use the profile variant which enables necessary kernel access:
+For profiling Rust code with `flamegraph`, add the `--profile` flag which enables necessary kernel access:
 
 ```bash
-claude-sandbox-rust-profile ~/projects/my-rust-app
+claude-sandbox rust ~/projects/my-rust-app --profile
 ```
 
 Inside the container, install flamegraph on-demand:
@@ -111,12 +112,13 @@ Each language image mounts volumes for caches and installed tools:
 
 | Image | Volumes |
 |-------|---------|
-| All | `claude-auth` (credentials) |
 | Go | `claude-go-cache` (modules), `claude-go-bin` (installed tools) |
 | Rust | `claude-cargo-registry`, `claude-cargo-git`, `claude-cargo-bin` (installed tools) |
 | Python | `claude-uv-cache` (packages), `claude-python-bin` (installed tools) |
 
 Tools installed via `go install`, `cargo install`, or `uv tool install` persist across sessions.
+
+Additionally, your host's `~/.claude` directory is bind-mounted for bidirectional sync of authentication and settings.
 
 ## Uninstall
 
@@ -128,10 +130,11 @@ This removes all Docker images and volumes. Manually remove the shell functions 
 
 ## Security Notes
 
-- **Container isolation**: Only the mounted project directory is accessible to Claude Code
-- **Persistent auth volume**: Credentials stored in Docker volume, not on host
+- **Container isolation**: Only the mounted project directory and `~/.claude` are accessible to Claude Code
+- **Bidirectional auth sync**: Credentials from `~/.claude` are shared between host and container
 - **Ephemeral containers**: The `--rm` flag ensures containers are destroyed on exit
 - **`--dangerously-skip-permissions`**: Safe here because the container provides the isolation boundary
+- **UID matching**: Container runs as your host UID, so file permissions work correctly
 
 ## Project-Level Instructions
 

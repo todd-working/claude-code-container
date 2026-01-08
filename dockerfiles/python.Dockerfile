@@ -25,11 +25,12 @@ USER claude
 # Set up Python environment
 ENV PATH="/home/claude/.local/bin:${PATH}"
 
-# Install Python tools via uv
+# Install Python tools via uv (chmod for --user flag compatibility)
 RUN uv tool install ruff \
     && uv tool install mypy \
     && uv tool install pytest \
-    && uv tool install ipython
+    && uv tool install ipython \
+    && chmod -R 777 /home/claude/.local /home/claude/.cache
 
 # Container-specific CLAUDE.md (copied to workspace/.claude/ on startup by base entrypoint)
 USER root
