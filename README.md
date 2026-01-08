@@ -1,13 +1,22 @@
 # Claude Code Container
 
-A little tool I built for myself to run Claude Code in **unhinged mode** with relative safety.
+A little tool I built for myself to run Claude Code **unhinged** with relative safety.
+
+The goal: let Claude run long-running processes—building, testing, debugging, iterating—with zero intervention. Walk away, come back, and your code is done (or at least thoroughly attempted).
 
 Claude runs with `--dangerously-skip-permissions` (no confirmation prompts), but inside a Docker container that isolates it from your host system. The container can only access the project directory you mount—so Claude can go wild without nuking your machine.
+
+> **DO NOT DEPLOY THIS TO PRODUCTION. DO NOT RUN THIS IN THE CLOUD.**
+>
+> This tool is designed for **local development machines only**. It runs an AI agent with full autonomous permissions inside a container. The isolation is "good enough" for a dev laptop where the blast radius is limited to one project. It is absolutely not hardened for any environment where security matters.
+>
+> Seriously: local dev only. Your laptop. Not a server. Not AWS. Not your company's Kubernetes cluster.
 
 > **Warning**: Your global `~/.claude` directory is mounted read-write into the container. This includes your authentication credentials, settings, and global CLAUDE.md. Claude can modify these files. Be careful, and consider adding protections to your `~/.claude/CLAUDE.md` (see below).
 
 ## Why Use This?
 
+- **Hands-off**: Let Claude build, test, fix, and iterate without you clicking "approve" every 10 seconds
 - **Unhinged**: Claude runs with `--dangerously-skip-permissions`, auto-approving all actions
 - **Isolated**: Container has no access to your host filesystem except the mounted project
 - **Safe-ish**: The combination means Claude can work freely without destroying your system
