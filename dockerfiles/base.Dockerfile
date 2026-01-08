@@ -39,9 +39,12 @@ RUN npm install -g @anthropic-ai/claude-code
 
 # Create non-root user with UID 1000 (delete ubuntu user first if it exists)
 # Make home directory world-writable so container can run as any UID (via --user flag)
+# Create /.claude mount point and symlink from $HOME/.claude
 RUN userdel -r ubuntu 2>/dev/null || true \
     && useradd -m -s /bin/bash -u 1000 claude \
-    && chmod 777 /home/claude
+    && chmod 777 /home/claude \
+    && mkdir -p /.claude && chmod 777 /.claude \
+    && ln -s /.claude /home/claude/.claude
 
 # Create entrypoint script that copies container CLAUDE.md to workspace
 RUN mkdir -p /opt/claude-container
@@ -66,14 +69,19 @@ check_claude_update() {
 }
 check_claude_update &
 
-# Copy container CLAUDE.md to workspace/.claude/ on startup
+# Merge container CLAUDE.md with workspace CLAUDE.md on startup
+# Container instructions first, then workspace-specific instructions appended
 MARKER="/home/claude/workspace/.claude/.container-initialized"
 if [ -f /opt/claude-container/CLAUDE.md ] && [ ! -f "$MARKER" ]; then
     mkdir -p /home/claude/workspace/.claude
     if [ -f /home/claude/workspace/.claude/CLAUDE.md ]; then
-        # Append to existing CLAUDE.md
+        # Save existing workspace content, then prepend container content
+        tmp_content=$(mktemp)
+        cp /home/claude/workspace/.claude/CLAUDE.md "$tmp_content"
+        cat /opt/claude-container/CLAUDE.md > /home/claude/workspace/.claude/CLAUDE.md
         echo "" >> /home/claude/workspace/.claude/CLAUDE.md
-        cat /opt/claude-container/CLAUDE.md >> /home/claude/workspace/.claude/CLAUDE.md
+        cat "$tmp_content" >> /home/claude/workspace/.claude/CLAUDE.md
+        rm -f "$tmp_content"
     else
         cp /opt/claude-container/CLAUDE.md /home/claude/workspace/.claude/CLAUDE.md
     fi
@@ -87,4 +95,4 @@ USER claude
 
 ENTRYPOINT ["/opt/claude-container/entrypoint.sh"]
 # Launch Claude Code with full permissions (safe since container is isolated)
-CMD ["script", "-q", "-c", "claude --dangerously-skip-permissions", "/dev/null"]
+CMD ["claude", "--dangerously-skip-permissions"]

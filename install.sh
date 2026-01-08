@@ -31,6 +31,8 @@ claude-sandbox() {
         esac
     done
 
+    # Resolve to absolute path (handles "." -> "/full/path/to/dir")
+    project_path="$(cd "$project_path" && pwd)"
     local project_name="$(basename "$project_path")"
     local image="claude-sandbox-base"
     local -a docker_args=()
@@ -85,9 +87,10 @@ claude-sandbox() {
     docker run -it --rm \
         --user "$(id -u):$(id -g)" \
         --name "claude-$project_name" \
+        -e HOME=/home/claude \
         -e TERM=xterm-256color \
         "${docker_args[@]}" \
-        -v "$HOME/.claude":/home/claude/.claude \
+        -v "$HOME/.claude":/.claude \
         -v "$project_path":/home/claude/workspace \
         "$image"
 }
