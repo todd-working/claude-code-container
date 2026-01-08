@@ -1,0 +1,166 @@
+#!/bin/zsh
+# claude-sandbox - Run Claude Code in a Docker container
+# Location: ~/.claude/bin/claude-sandbox (installed by install.sh)
+#
+# Usage: claude-sandbox [go|rust|python|base] [project_path] [--profile]
+#
+# Examples:
+#   claude-sandbox python .        # Python container, current directory
+#   claude-sandbox go ~/myproject  # Go container, specific project
+#   claude-sandbox rust . --profile # Rust with profiling enabled
+
+set -e
+
+lang="base"
+project_path="$(pwd)"
+profile_mode=false
+
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -h|--help)
+            echo "Usage: claude-sandbox [go|rust|python|base] [project_path] [--profile]"
+            echo ""
+            echo "Options:"
+            echo "  go|rust|python|base  Language container (default: base)"
+            echo "  project_path         Directory to mount (default: current dir)"
+            echo "  --profile            Enable profiling for Rust containers"
+            echo ""
+            echo "Environment:"
+            echo "  CLAUDE_SANDBOX_SKIP_NETWORK  Skip network selection prompt"
+            exit 0
+            ;;
+        --profile)
+            profile_mode=true
+            shift
+            ;;
+        go|rust|python|py|base)
+            lang="$1"
+            shift
+            ;;
+        *)
+            if [[ -d "$1" ]]; then
+                project_path="$1"
+            else
+                echo "Unknown argument: $1"
+                echo "Usage: claude-sandbox [go|rust|python|base] [project_path] [--profile]"
+                exit 1
+            fi
+            shift
+            ;;
+    esac
+done
+
+# Resolve to absolute path (handles "." -> "/full/path/to/dir")
+project_path="$(cd "$project_path" && pwd)"
+project_name="$(basename "$project_path")"
+
+# Select image and volumes based on language
+image="claude-sandbox-base"
+docker_args=()
+
+case "$lang" in
+    go)
+        image="claude-sandbox-go"
+        docker_args+=(-v claude-go-cache:/home/claude/go/pkg -v claude-go-bin:/home/claude/go/bin)
+        ;;
+    rust)
+        image="claude-sandbox-rust"
+        docker_args+=(-v claude-cargo-registry:/home/claude/.cargo/registry -v claude-cargo-git:/home/claude/.cargo/git -v claude-cargo-bin:/home/claude/.cargo/bin)
+        if $profile_mode; then
+            docker_args+=(--cap-add=SYS_PTRACE --security-opt seccomp=unconfined)
+            echo "Profiling mode enabled (SYS_PTRACE + seccomp=unconfined)"
+        fi
+        ;;
+    python|py)
+        image="claude-sandbox-python"
+        docker_args+=(-v claude-uv-cache:/home/claude/.cache/uv -v claude-python-bin:/home/claude/.local/bin)
+        ;;
+    base)
+        image="claude-sandbox-base"
+        ;;
+esac
+
+# Warn if --profile used with non-Rust
+if $profile_mode && [[ "$lang" != "rust" ]]; then
+    echo "Warning: --profile only affects Rust containers (ignored)"
+fi
+
+# ============================================================
+# PRE-FLIGHT CHECKS
+# ============================================================
+
+echo "Pre-flight checks..."
+
+# Check ~/.claude exists
+if [[ ! -d "$HOME/.claude" ]]; then
+    echo "✗ ~/.claude not found."
+    echo ""
+    echo "  Run Claude Code outside the container first:"
+    echo "    npx @anthropic-ai/claude-code"
+    exit 1
+fi
+
+# Check image exists
+if ! docker image inspect "$image" &>/dev/null; then
+    echo "✗ Docker image '$image' not found."
+    echo ""
+    echo "  Build it first (from claude-code-container repo):"
+    echo "    make build-base   # or build-python, build-go, build-rust"
+    exit 1
+fi
+
+# Show mount info
+echo ""
+echo "Mounts:"
+echo "  ~/.claude → /home/claude/.claude"
+echo "  $project_path → /home/claude/workspace"
+
+# Check CLAUDE.md files
+[[ -f "$HOME/.claude/CLAUDE.md" ]] && echo "  ✓ Global CLAUDE.md" || echo "  ○ No global CLAUDE.md"
+if [[ -f "$project_path/CLAUDE.md" ]]; then
+    echo "  ✓ Project CLAUDE.md (root)"
+elif [[ -f "$project_path/.claude/CLAUDE.md" ]]; then
+    echo "  ✓ Project CLAUDE.md (.claude/)"
+else
+    echo "  ○ No project CLAUDE.md"
+fi
+echo ""
+
+# ============================================================
+# NETWORK SELECTION (optional)
+# ============================================================
+
+if [[ -z "${CLAUDE_SANDBOX_SKIP_NETWORK:-}" ]]; then
+    # Get custom networks (zsh array syntax)
+    networks=("${(@f)$(docker network ls --format "{{.Name}}" | grep -vE "^(bridge|host|none)$")}")
+    if [[ ${#networks[@]} -gt 0 && -n "${networks[1]}" ]]; then
+        echo "Available Docker networks:"
+        echo "  0) None (default)"
+        local i=1
+        for net in "${networks[@]}"; do
+            [[ -n "$net" ]] && echo "  $i) $net" && ((i++))
+        done
+        echo -n "Join a network? [0-$((i-1))]: "
+        read -r choice
+        if [[ "$choice" =~ ^[1-9][0-9]*$ ]] && [[ $choice -lt $i ]]; then
+            local selected_network="${networks[$choice]}"
+            docker_args+=(--network "$selected_network")
+            echo "Joining network: $selected_network"
+        fi
+    fi
+fi
+
+# ============================================================
+# RUN CONTAINER
+# ============================================================
+
+docker run -it --rm \
+    --user "$(id -u):$(id -g)" \
+    --name "claude-$project_name" \
+    -e HOME=/home/claude \
+    -e TERM=xterm-256color \
+    "${docker_args[@]}" \
+    -v "$HOME/.claude":/home/claude/.claude \
+    -v "$project_path":/home/claude/workspace \
+    "$image"

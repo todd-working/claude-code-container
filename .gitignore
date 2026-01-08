@@ -1,0 +1,12 @@
+# Claude Code project files (container-generated)
+.claude/
+
+# macOS
+.DS_Store
+
+# Editor
+*.swp
+*.swo
+*~
+.idea/
+.vscode/

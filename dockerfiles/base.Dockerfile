@@ -39,17 +39,58 @@ RUN npm install -g @anthropic-ai/claude-code
 
 # Create non-root user with UID 1000 (delete ubuntu user first if it exists)
 # Make home directory world-writable so container can run as any UID (via --user flag)
-# Create /.claude mount point and symlink from $HOME/.claude
 RUN userdel -r ubuntu 2>/dev/null || true \
     && useradd -m -s /bin/bash -u 1000 claude \
-    && chmod 777 /home/claude \
-    && mkdir -p /.claude && chmod 777 /.claude \
-    && ln -s /.claude /home/claude/.claude
+    && chmod 777 /home/claude
 
 # Create entrypoint script that copies container CLAUDE.md to workspace
 RUN mkdir -p /opt/claude-container
 COPY --chmod=755 <<'SCRIPT' /opt/claude-container/entrypoint.sh
 #!/bin/bash
+
+# Verify mount points are accessible
+verify_mounts() {
+    local failed=false
+
+    # Check ~/.claude is writable
+    if ! touch ~/.claude/.mount-test 2>/dev/null; then
+        echo "⚠ Warning: ~/.claude is not writable"
+        failed=true
+    else
+        rm -f ~/.claude/.mount-test
+    fi
+
+    # Check workspace is writable
+    if ! touch /home/claude/workspace/.mount-test 2>/dev/null; then
+        echo "⚠ Warning: /home/claude/workspace is not writable"
+        failed=true
+    else
+        rm -f /home/claude/workspace/.mount-test
+    fi
+
+    # Check for CLAUDE.md files (informational)
+    if [ -f ~/.claude/CLAUDE.md ]; then
+        echo "✓ Global CLAUDE.md found"
+    else
+        echo "○ No global ~/.claude/CLAUDE.md"
+    fi
+
+    if [ -f /home/claude/workspace/CLAUDE.md ]; then
+        echo "✓ Project CLAUDE.md found (root)"
+    elif [ -f /home/claude/workspace/.claude/CLAUDE.md ]; then
+        echo "✓ Project CLAUDE.md found (.claude/)"
+    else
+        echo "○ No project CLAUDE.md (run /init to create)"
+    fi
+
+    if $failed; then
+        echo ""
+        echo "Mount verification failed. Check your docker run command."
+        echo "Expected: -v \"\$HOME/.claude\":/home/claude/.claude"
+        echo "          -v \"\$PROJECT\":/home/claude/workspace"
+    fi
+}
+verify_mounts
 
 # Check for Claude Code CLI updates (background, non-blocking)
 check_claude_update() {

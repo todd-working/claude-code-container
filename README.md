@@ -18,18 +18,27 @@ A Docker-based sandbox for running Claude Code CLI in isolation from your host s
 | `claude-sandbox-rust` | Rust stable, clippy, rustfmt, rust-analyzer, cargo-watch |
 | `claude-sandbox-python` | Python 3.12, uv, ruff, mypy, pytest, ipython |
 
+## Prerequisites
+
+1. **Docker Desktop** - Install and start Docker Desktop
+2. **Claude Code CLI** - Run once outside the container to create `~/.claude`:
+   ```bash
+   npx @anthropic-ai/claude-code
+   ```
+
 ## Installation
 
 ```bash
 git clone https://github.com/todd-working/claude-code-container.git
 cd claude-code-container
 make install
-source ~/.zshrc
+source ~/.zshrc  # or open a new terminal
 ```
 
 This will:
 1. Build all Docker images (base + language variants)
-2. Add the `claude-sandbox` shell function to your `~/.zshrc`
+2. Install `claude-sandbox` script to `~/.claude/bin/`
+3. Add `~/.claude/bin` to your PATH
 
 Your `~/.claude` directory is mounted directly into the container, so authentication and settings sync bidirectionally between host and container.
 
@@ -126,7 +135,12 @@ Additionally, your host's `~/.claude` directory is bind-mounted for bidirectiona
 make uninstall
 ```
 
-This removes all Docker images and volumes. Manually remove the shell functions from `~/.zshrc` if desired.
+This removes all Docker images and volumes. To fully uninstall:
+
+```bash
+rm ~/.claude/bin/claude-sandbox
+# Remove the PATH line from ~/.zshrc if desired
+```
 
 ## Security Notes
 
