@@ -50,8 +50,11 @@ COPY --chmod=755 <<'SCRIPT' /opt/claude-container/entrypoint.sh
 
 # Check for Claude Code CLI updates (background, non-blocking)
 check_claude_update() {
+    # Wait for Claude to start before printing anything to avoid output interleaving
+    sleep 3
     local installed=$(claude --version 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
-    local latest=$(npm show @anthropic-ai/claude-code version 2>/dev/null)
+    # Timeout after 5 seconds to avoid hanging on slow/unreachable registry
+    local latest=$(timeout 5 npm show @anthropic-ai/claude-code version 2>/dev/null)
     if [ -n "$installed" ] && [ -n "$latest" ] && [ "$installed" != "$latest" ]; then
         echo ""
         echo "╔════════════════════════════════════════════════════════════╗"
