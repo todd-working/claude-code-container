@@ -1,12 +1,16 @@
 # Claude Code Container
 
-A Docker-based sandbox for running Claude Code CLI in isolation from your host system, with language-specific images for Go, Rust, and Python development.
+A little tool I built for myself to run Claude Code in **unhinged mode** with relative safety.
+
+Claude runs with `--dangerously-skip-permissions` (no confirmation prompts), but inside a Docker container that isolates it from your host system. The container can only access the project directory you mount—so Claude can go wild without nuking your machine.
+
+> **Warning**: Your global `~/.claude` directory is mounted read-write into the container. This includes your authentication credentials, settings, and global CLAUDE.md. Claude can modify these files. Be careful, and consider adding protections to your `~/.claude/CLAUDE.md` (see below).
 
 ## Why Use This?
 
-- **Isolation**: Claude Code runs in a container with no access to your host filesystem (except the project you mount)
-- **Unconstrained**: Claude Code runs with `--dangerously-skip-permissions`, auto-approving all actions
-- **Safe**: The combination of container isolation + full permissions means Claude can work freely without risk to your host
+- **Unhinged**: Claude runs with `--dangerously-skip-permissions`, auto-approving all actions
+- **Isolated**: Container has no access to your host filesystem except the mounted project
+- **Safe-ish**: The combination means Claude can work freely without destroying your system
 - **Language-optimized**: Dedicated images with full toolchains, linters, and profilers
 
 ## Available Images
@@ -135,11 +139,11 @@ Additionally, your host's `~/.claude` directory is bind-mounted for bidirectiona
 make uninstall
 ```
 
-This removes all Docker images and volumes. To fully uninstall:
+This removes Docker images, volumes, and the `~/.claude/bin/claude-sandbox` script.
 
+To also remove the PATH entry, edit your `~/.zshrc` and remove the line:
 ```bash
-rm ~/.claude/bin/claude-sandbox
-# Remove the PATH line from ~/.zshrc if desired
+export PATH="$HOME/.claude/bin:$PATH"
 ```
 
 ## Security Notes
@@ -150,17 +154,25 @@ rm ~/.claude/bin/claude-sandbox
 - **`--dangerously-skip-permissions`**: Safe here because the container provides the isolation boundary
 - **UID matching**: Container runs as your host UID, so file permissions work correctly
 
+### Protecting Your Global ~/.claude Directory
+
+Since `~/.claude` is mounted read-write, Claude can modify your global settings and CLAUDE.md. To add a safeguard, add this to your `~/.claude/CLAUDE.md`:
+
+```markdown
+# Global Claude Configuration
+
+**IMPORTANT**: This is my global ~/.claude directory. Always ask before modifying any files here, including this file, settings.json, or any other configuration.
+```
+
+This won't prevent changes when Claude is unhinged, but it helps when running Claude normally outside the container.
+
 ## Project-Level Instructions
 
-On first run, each language container creates a `.claude/CLAUDE.md` in your project with container-specific instructions (cross-compilation, Makefile templates, etc.). This helps Claude Code understand the container environment.
+Language containers (Python, Go, Rust) will append container-specific instructions to your project's `CLAUDE.md` on first run. This includes cross-compilation notes, tooling tips, and Makefile templates.
 
-If you don't want this tracked in git, add to your `.gitignore`:
+**Important**: The container only appends to an existing CLAUDE.md—it won't create one. Run `/init` inside Claude first to create your project's CLAUDE.md, then the container will add its instructions on next startup.
 
-```
-.claude/
-```
-
-Or to keep your own CLAUDE.md but ignore the container marker:
+To ignore the container marker file in git:
 
 ```
 .claude/.container-initialized
