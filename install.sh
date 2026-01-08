@@ -1,6 +1,7 @@
 #!/bin/bash
 
 SHELL_FUNCTION='# BEGIN Claude Code sandbox functions
+# shellcheck shell=zsh
 claude-sandbox() {
     local lang="base"
     local project_path="$(pwd)"
@@ -32,26 +33,24 @@ claude-sandbox() {
 
     local project_name="$(basename "$project_path")"
     local image="claude-sandbox-base"
-    local extra_volumes=""
-    local extra_flags=""
-    local network_flag=""
+    local -a docker_args=()
 
     case "$lang" in
         go)
             image="claude-sandbox-go"
-            extra_volumes="-v claude-go-cache:/home/claude/go/pkg -v claude-go-bin:/home/claude/go/bin"
+            docker_args+=(-v claude-go-cache:/home/claude/go/pkg -v claude-go-bin:/home/claude/go/bin)
             ;;
         rust)
             image="claude-sandbox-rust"
-            extra_volumes="-v claude-cargo-registry:/home/claude/.cargo/registry -v claude-cargo-git:/home/claude/.cargo/git -v claude-cargo-bin:/home/claude/.cargo/bin"
+            docker_args+=(-v claude-cargo-registry:/home/claude/.cargo/registry -v claude-cargo-git:/home/claude/.cargo/git -v claude-cargo-bin:/home/claude/.cargo/bin)
             if $profile_mode; then
-                extra_flags="--cap-add=SYS_PTRACE --security-opt seccomp=unconfined"
+                docker_args+=(--cap-add=SYS_PTRACE --security-opt seccomp=unconfined)
                 echo "Profiling mode enabled (SYS_PTRACE + seccomp=unconfined)"
             fi
             ;;
         python|py)
             image="claude-sandbox-python"
-            extra_volumes="-v claude-uv-cache:/home/claude/.cache/uv -v claude-python-bin:/home/claude/.local/bin"
+            docker_args+=(-v claude-uv-cache:/home/claude/.cache/uv -v claude-python-bin:/home/claude/.local/bin)
             ;;
         base)
             image="claude-sandbox-base"
@@ -63,22 +62,23 @@ claude-sandbox() {
         echo "Warning: --profile only affects Rust containers (ignored)"
     fi
 
-    # List available Docker networks and ask if user wants to join one
-    local networks=($(docker network ls --format "{{.Name}}" | grep -vE "^(bridge|host|none)$"))
-    if [[ ${#networks[@]} -gt 0 ]]; then
-        echo "Available Docker networks:"
-        echo "  0) None (default)"
-        local i=1
-        for net in "${networks[@]}"; do
-            echo "  $i) $net"
-            ((i++))
-        done
-        echo -n "Join a network? [0-$((i-1))]: "
-        read -r choice
-        if [[ "$choice" =~ ^[1-9][0-9]*$ ]] && [[ $choice -le ${#networks[@]} ]]; then
-            local selected_network="${networks[$((choice-1))]}"
-            network_flag="--network $selected_network"
-            echo "Joining network: $selected_network"
+    # List available Docker networks (skip if CLAUDE_SANDBOX_SKIP_NETWORK is set)
+    if [[ -z "${CLAUDE_SANDBOX_SKIP_NETWORK:-}" ]]; then
+        local networks=("${(@f)$(docker network ls --format "{{.Name}}" | grep -vE "^(bridge|host|none)$")}")
+        if [[ ${#networks[@]} -gt 0 && -n "${networks[1]}" ]]; then
+            echo "Available Docker networks:"
+            echo "  0) None (default)"
+            local i=1
+            for net in "${networks[@]}"; do
+                [[ -n "$net" ]] && echo "  $i) $net" && ((i++))
+            done
+            echo -n "Join a network? [0-$((i-1))]: "
+            read -r choice
+            if [[ "$choice" =~ ^[1-9][0-9]*$ ]] && [[ $choice -lt $i ]]; then
+                local selected_network="${networks[$choice]}"
+                docker_args+=(--network "$selected_network")
+                echo "Joining network: $selected_network"
+            fi
         fi
     fi
 
@@ -86,11 +86,9 @@ claude-sandbox() {
         --user "$(id -u):$(id -g)" \
         --name "claude-$project_name" \
         -e TERM=xterm-256color \
-        $network_flag \
-        $extra_flags \
+        "${docker_args[@]}" \
         -v "$HOME/.claude":/home/claude/.claude \
         -v "$project_path":/home/claude/workspace \
-        ${=extra_volumes} \
         "$image"
 }
 # END Claude Code sandbox functions'
