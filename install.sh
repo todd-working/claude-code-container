@@ -1,137 +1,166 @@
 #!/bin/bash
+# install.sh - Install claude-sandbox command
+#
+# This script:
+# 1. Checks prerequisites (Docker, ~/.claude, base image)
+# 2. Installs claude-sandbox to ~/.claude/bin/
+# 3. Adds ~/.claude/bin to PATH in your shell rc file
+# 4. Removes old shell function if present (migration)
 
-SHELL_FUNCTION='# BEGIN Claude Code sandbox functions
-# shellcheck shell=zsh
-claude-sandbox() {
-    local lang="base"
-    local project_path="$(pwd)"
-    local profile_mode=false
+set -e
 
-    # Parse arguments
-    while [[ $# -gt 0 ]]; do
-        case "$1" in
-            --profile)
-                profile_mode=true
-                shift
-                ;;
-            go|rust|python|py|base)
-                lang="$1"
-                shift
-                ;;
-            *)
-                if [[ -d "$1" ]]; then
-                    project_path="$1"
-                else
-                    echo "Unknown argument: $1"
-                    echo "Usage: claude-sandbox [go|rust|python|base] [project_path] [--profile]"
-                    return 1
-                fi
-                shift
-                ;;
-        esac
-    done
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+INSTALL_DIR="$HOME/.claude/bin"
+SCRIPT_NAME="claude-sandbox"
 
-    # Resolve to absolute path (handles "." -> "/full/path/to/dir")
-    project_path="$(cd "$project_path" && pwd)"
-    local project_name="$(basename "$project_path")"
-    local image="claude-sandbox-base"
-    local -a docker_args=()
-
-    case "$lang" in
-        go)
-            image="claude-sandbox-go"
-            docker_args+=(-v claude-go-cache:/home/claude/go/pkg -v claude-go-bin:/home/claude/go/bin)
-            ;;
-        rust)
-            image="claude-sandbox-rust"
-            docker_args+=(-v claude-cargo-registry:/home/claude/.cargo/registry -v claude-cargo-git:/home/claude/.cargo/git -v claude-cargo-bin:/home/claude/.cargo/bin)
-            if $profile_mode; then
-                docker_args+=(--cap-add=SYS_PTRACE --security-opt seccomp=unconfined)
-                echo "Profiling mode enabled (SYS_PTRACE + seccomp=unconfined)"
-            fi
-            ;;
-        python|py)
-            image="claude-sandbox-python"
-            docker_args+=(-v claude-uv-cache:/home/claude/.cache/uv -v claude-python-bin:/home/claude/.local/bin)
-            ;;
-        base)
-            image="claude-sandbox-base"
-            ;;
-    esac
-
-    # Warn if --profile used with non-Rust
-    if $profile_mode && [[ "$lang" != "rust" ]]; then
-        echo "Warning: --profile only affects Rust containers (ignored)"
-    fi
-
-    # List available Docker networks (skip if CLAUDE_SANDBOX_SKIP_NETWORK is set)
-    if [[ -z "${CLAUDE_SANDBOX_SKIP_NETWORK:-}" ]]; then
-        local networks=("${(@f)$(docker network ls --format "{{.Name}}" | grep -vE "^(bridge|host|none)$")}")
-        if [[ ${#networks[@]} -gt 0 && -n "${networks[1]}" ]]; then
-            echo "Available Docker networks:"
-            echo "  0) None (default)"
-            local i=1
-            for net in "${networks[@]}"; do
-                [[ -n "$net" ]] && echo "  $i) $net" && ((i++))
-            done
-            echo -n "Join a network? [0-$((i-1))]: "
-            read -r choice
-            if [[ "$choice" =~ ^[1-9][0-9]*$ ]] && [[ $choice -lt $i ]]; then
-                local selected_network="${networks[$choice]}"
-                docker_args+=(--network "$selected_network")
-                echo "Joining network: $selected_network"
-            fi
-        fi
-    fi
-
-    docker run -it --rm \
-        --user "$(id -u):$(id -g)" \
-        --name "claude-$project_name" \
-        -e HOME=/home/claude \
-        -e TERM=xterm-256color \
-        "${docker_args[@]}" \
-        -v "$HOME/.claude":/.claude \
-        -v "$project_path":/home/claude/workspace \
-        "$image"
-}
-# END Claude Code sandbox functions'
-
-RC_FILE="$HOME/.zshrc"
-
-# Remove old claude-sandbox functions if they exist
-remove_old_functions() {
-    if grep -q "claude-sandbox()" "$RC_FILE" 2>/dev/null; then
-        echo "Removing old claude-sandbox functions from $RC_FILE..."
-        # Try new marker-based removal first (robust)
-        if grep -q "# BEGIN Claude Code sandbox" "$RC_FILE" 2>/dev/null; then
-            sed -i.bak '/# BEGIN Claude Code sandbox/,/# END Claude Code sandbox/d' "$RC_FILE"
-        else
-            # Fallback for old installations without markers
-            sed -i.bak '/# Claude Code sandbox/,/^}$/d' "$RC_FILE"
-            sed -i.bak '/claude-sandbox-rust-profile()/,/^}$/d' "$RC_FILE"
-        fi
-        # Clean up consecutive empty lines
-        sed -i.bak '/^$/N;/^\n$/d' "$RC_FILE"
-        rm -f "$RC_FILE.bak"
-        echo "Old functions removed."
-    fi
-}
-
-remove_old_functions
-
-echo "This will add the following to $RC_FILE:"
-echo ""
-echo "$SHELL_FUNCTION"
-echo ""
-read -p "Proceed? [y/N] " -n 1 -r
+echo "Installing claude-sandbox..."
 echo ""
 
-if [[ $REPLY =~ ^[Yy]$ ]]; then
-    echo "" >> "$RC_FILE"
-    echo "$SHELL_FUNCTION" >> "$RC_FILE"
-    echo ""
-    echo "Done! Run 'source $RC_FILE' to activate."
-else
-    echo "Aborted"
+# ============================================================
+# PREREQUISITE CHECKS
+# ============================================================
+
+# Check Docker is installed
+if ! command -v docker &>/dev/null; then
+    echo "✗ Docker not found. Install Docker Desktop first."
     exit 1
 fi
+
+# Check Docker is running
+if ! docker info &>/dev/null 2>&1; then
+    echo "✗ Docker is not running. Start Docker Desktop first."
+    exit 1
+fi
+echo "✓ Docker is running"
+
+# Check ~/.claude exists
+if [[ ! -d "$HOME/.claude" ]]; then
+    echo ""
+    echo "✗ ~/.claude not found."
+    echo ""
+    echo "  Claude Code needs to run once outside the container to create"
+    echo "  authentication credentials and settings."
+    echo ""
+    echo "  Run this first:"
+    echo "    npx @anthropic-ai/claude-code"
+    echo ""
+    echo "  Then re-run this installer."
+    exit 1
+fi
+echo "✓ ~/.claude exists"
+
+# Check if base image exists (offer to build)
+if ! docker image inspect claude-sandbox-base &>/dev/null 2>&1; then
+    echo ""
+    echo "⚠ Docker image 'claude-sandbox-base' not found."
+    echo ""
+    read -p "Build now? [y/N] " -n 1 -r
+    echo ""
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        make -C "$SCRIPT_DIR" build-base || exit 1
+    else
+        echo "Skipping. Run 'make build-base' before using claude-sandbox."
+    fi
+else
+    echo "✓ Base image exists"
+fi
+
+echo ""
+
+# ============================================================
+# MIGRATION: Remove old shell function from rc files
+# ============================================================
+
+remove_old_function() {
+    local rc_file="$1"
+    if [[ -f "$rc_file" ]] && grep -q "# BEGIN Claude Code sandbox" "$rc_file" 2>/dev/null; then
+        echo "Removing old claude-sandbox function from $rc_file..."
+        # Remove everything between BEGIN and END markers
+        if sed -i.bak '/# BEGIN Claude Code sandbox/,/# END Claude Code sandbox/d' "$rc_file"; then
+            rm -f "$rc_file.bak"
+            echo "✓ Old function removed"
+        else
+            echo "⚠ Could not remove old function from $rc_file"
+            echo "  Backup saved at: $rc_file.bak"
+        fi
+    fi
+}
+
+# Check common rc files for old function
+remove_old_function "$HOME/.zshrc"
+remove_old_function "$HOME/.bashrc"
+remove_old_function "$HOME/.profile"
+
+# ============================================================
+# INSTALL SCRIPT
+# ============================================================
+
+# Validate source script exists
+if [[ ! -f "$SCRIPT_DIR/bin/claude-sandbox" ]]; then
+    echo "✗ bin/claude-sandbox not found in $SCRIPT_DIR"
+    echo "  Make sure you're running from the claude-code-container repository."
+    exit 1
+fi
+
+# Create bin directory
+mkdir -p "$INSTALL_DIR"
+
+# Copy script
+cp "$SCRIPT_DIR/bin/claude-sandbox" "$INSTALL_DIR/$SCRIPT_NAME"
+chmod +x "$INSTALL_DIR/$SCRIPT_NAME"
+
+echo "Created: $INSTALL_DIR/$SCRIPT_NAME"
+echo ""
+
+# ============================================================
+# ADD TO PATH
+# ============================================================
+
+# Detect shell and select rc file
+PATH_LINE='export PATH="$HOME/.claude/bin:$PATH"'
+
+case "$SHELL" in
+    */zsh)  RC_FILE="$HOME/.zshrc" ;;
+    */bash) RC_FILE="$HOME/.bashrc" ;;
+    *)      RC_FILE="$HOME/.profile" ;;
+esac
+
+# Check if already in PATH (check both current PATH and rc file)
+if [[ ":$PATH:" == *":$HOME/.claude/bin:"* ]]; then
+    echo "~/.claude/bin already in PATH"
+elif grep -qF '.claude/bin' "$RC_FILE" 2>/dev/null; then
+    echo "PATH already configured in $RC_FILE"
+else
+    echo "" >> "$RC_FILE"
+    echo "# Claude Code sandbox" >> "$RC_FILE"
+    echo "$PATH_LINE" >> "$RC_FILE"
+    echo "Added to PATH in $RC_FILE:"
+    echo "  $PATH_LINE"
+fi
+
+# Verify PATH is correct
+if [[ ":$PATH:" != *":$HOME/.claude/bin:"* ]]; then
+    echo ""
+    echo "⚠ Note: ~/.claude/bin is not yet in your current PATH."
+    echo "  Run: source $RC_FILE"
+    echo "  Or open a new terminal."
+fi
+
+echo ""
+echo "============================================================"
+echo "Installation complete!"
+echo ""
+echo "To activate now:"
+echo "  source $RC_FILE"
+echo ""
+echo "Or open a new terminal."
+echo ""
+echo "Usage:"
+echo "  claude-sandbox [python|go|rust|base] [project_path]"
+echo ""
+echo "Examples:"
+echo "  claude-sandbox python .        # Python, current directory"
+echo "  claude-sandbox go ~/myproject  # Go, specific project"
+echo ""
+echo "Script location: $INSTALL_DIR/$SCRIPT_NAME"
+echo "============================================================"

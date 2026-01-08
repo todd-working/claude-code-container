@@ -14,7 +14,7 @@ help:
 	@echo "  make build-rust    - Build Rust development image"
 	@echo "  make build-python  - Build Python development image"
 	@echo "  make build         - Alias for build-base (backward compat)"
-	@echo "  make install       - Build all images and add shell function to ~/.zshrc"
+	@echo "  make install       - Build all images and install claude-sandbox command"
 	@echo "  make update-claude - Rebuild base with latest Claude Code CLI"
 	@echo "  make update-go     - Rebuild Go image with latest tools"
 	@echo "  make update-rust   - Rebuild Rust image with latest tools"
@@ -65,4 +65,5 @@ update-all: update-go update-rust update-python
 uninstall:
 	docker rmi $(BASE_IMAGE) $(GO_IMAGE) $(RUST_IMAGE) $(PYTHON_IMAGE) 2>/dev/null || true
 	docker volume rm claude-cargo-registry claude-cargo-git claude-cargo-bin claude-go-cache claude-go-bin claude-uv-cache claude-python-bin 2>/dev/null || true
-	@echo "Images and volumes removed. Manually remove the claude-sandbox function from ~/.zshrc if desired."
+	@echo "Images and volumes removed."
+	@echo "To fully uninstall: rm ~/.claude/bin/claude-sandbox"
