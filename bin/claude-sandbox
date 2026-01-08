@@ -19,15 +19,43 @@ profile_mode=false
 while [[ $# -gt 0 ]]; do
     case "$1" in
         -h|--help)
-            echo "Usage: claude-sandbox [go|rust|python|base] [project_path] [--profile]"
-            echo ""
-            echo "Options:"
-            echo "  go|rust|python|base  Language container (default: base)"
-            echo "  project_path         Directory to mount (default: current dir)"
-            echo "  --profile            Enable profiling for Rust containers"
-            echo ""
-            echo "Environment:"
-            echo "  CLAUDE_SANDBOX_SKIP_NETWORK  Skip network selection prompt"
+            cat <<'HELP'
+claude-sandbox - Run Claude Code unhinged in a Docker container
+
+USAGE
+    claude-sandbox [LANGUAGE] [PROJECT_PATH] [OPTIONS]
+
+LANGUAGES
+    base      Node.js, Claude CLI, git, common tools (default)
+    python    Python 3.12, uv, ruff, mypy, pytest
+    go        Go 1.23, golangci-lint, delve, gopls
+    rust      Rust stable, clippy, rust-analyzer, cargo-watch
+
+OPTIONS
+    --profile   Enable profiling for Rust (adds SYS_PTRACE capability)
+    -h, --help  Show this help message
+
+EXAMPLES
+    claude-sandbox                     # Base image, current directory
+    claude-sandbox python .            # Python image, current directory
+    claude-sandbox go ~/projects/api   # Go image, specific project
+    claude-sandbox rust . --profile    # Rust with flamegraph support
+
+WHAT IT DOES
+    Runs Claude Code with --dangerously-skip-permissions inside a container.
+    Claude can build, test, and iterate autonomously without approval prompts.
+    Only the project directory and ~/.claude are accessible to the container.
+
+MOUNTS
+    ~/.claude              -> /home/claude/.claude  (auth, settings)
+    <project_path>         -> /home/claude/workspace
+
+ENVIRONMENT
+    CLAUDE_SANDBOX_SKIP_NETWORK    Skip the Docker network selection prompt
+
+MORE INFO
+    https://github.com/todd-working/claude-code-container
+HELP
             exit 0
             ;;
         --profile)
