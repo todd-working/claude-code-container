@@ -1,4 +1,4 @@
-.PHONY: build build-base build-go build-rust build-python build-all \
+.PHONY: build-base build-go build-rust build-python build-all \
         install uninstall update-claude update-go update-rust update-python update-all help
 
 BASE_IMAGE := claude-sandbox-base
@@ -8,19 +8,22 @@ PYTHON_IMAGE := claude-sandbox-python
 
 help:
 	@echo "Usage:"
+	@echo "  make install       - Build all images and install claude-sandbox command"
+	@echo "  make uninstall     - Remove images, volumes, and claude-sandbox script"
+	@echo ""
+	@echo "Build:"
 	@echo "  make build-all     - Build all Docker images"
 	@echo "  make build-base    - Build base image only"
-	@echo "  make build-go      - Build Go development image"
-	@echo "  make build-rust    - Build Rust development image"
-	@echo "  make build-python  - Build Python development image"
-	@echo "  make build         - Alias for build-base (backward compat)"
-	@echo "  make install       - Build all images and install claude-sandbox command"
-	@echo "  make update-claude - Rebuild base with latest Claude Code CLI"
-	@echo "  make update-go     - Rebuild Go image with latest tools"
-	@echo "  make update-rust   - Rebuild Rust image with latest tools"
-	@echo "  make update-python - Rebuild Python image with latest tools"
+	@echo "  make build-go      - Build Go image"
+	@echo "  make build-rust    - Build Rust image"
+	@echo "  make build-python  - Build Python image"
+	@echo ""
+	@echo "Update:"
 	@echo "  make update-all    - Rebuild everything with latest versions"
-	@echo "  make uninstall     - Remove all Docker images and volumes"
+	@echo "  make update-claude - Rebuild base with latest Claude Code CLI"
+	@echo "  make update-go     - Rebuild Go image"
+	@echo "  make update-rust   - Rebuild Rust image"
+	@echo "  make update-python - Rebuild Python image"
 
 build-base:
 	docker build -t $(BASE_IMAGE) -f dockerfiles/base.Dockerfile .
@@ -35,9 +38,6 @@ build-python: build-base
 	docker build -t $(PYTHON_IMAGE) -f dockerfiles/python.Dockerfile .
 
 build-all: build-base build-go build-rust build-python
-
-# Backward compatibility
-build: build-base
 
 install: build-all
 	@./install.sh
@@ -65,5 +65,6 @@ update-all: update-go update-rust update-python
 uninstall:
 	docker rmi $(BASE_IMAGE) $(GO_IMAGE) $(RUST_IMAGE) $(PYTHON_IMAGE) 2>/dev/null || true
 	docker volume rm claude-cargo-registry claude-cargo-git claude-cargo-bin claude-go-cache claude-go-bin claude-uv-cache claude-python-bin 2>/dev/null || true
-	@echo "Images and volumes removed."
-	@echo "To fully uninstall: rm ~/.claude/bin/claude-sandbox"
+	rm -f $(HOME)/.claude/bin/claude-sandbox
+	@echo "Removed: Docker images, volumes, and ~/.claude/bin/claude-sandbox"
+	@echo "Note: PATH entry in shell rc file can be removed manually if desired"

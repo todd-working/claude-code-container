@@ -110,22 +110,24 @@ check_claude_update() {
 }
 check_claude_update &
 
-# Merge container CLAUDE.md with workspace CLAUDE.md on startup
-# Container instructions first, then workspace-specific instructions appended
+# Append container-specific instructions to existing CLAUDE.md (if present)
+# Only append, never create - user should run /init first
 MARKER="/home/claude/workspace/.claude/.container-initialized"
 if [ -f /opt/claude-container/CLAUDE.md ] && [ ! -f "$MARKER" ]; then
-    mkdir -p /home/claude/workspace/.claude
     if [ -f /home/claude/workspace/.claude/CLAUDE.md ]; then
-        # Save existing workspace content, then prepend container content
-        tmp_content=$(mktemp)
-        cp /home/claude/workspace/.claude/CLAUDE.md "$tmp_content"
-        cat /opt/claude-container/CLAUDE.md > /home/claude/workspace/.claude/CLAUDE.md
+        # Append container instructions to existing CLAUDE.md
         echo "" >> /home/claude/workspace/.claude/CLAUDE.md
-        cat "$tmp_content" >> /home/claude/workspace/.claude/CLAUDE.md
-        rm -f "$tmp_content"
+        cat /opt/claude-container/CLAUDE.md >> /home/claude/workspace/.claude/CLAUDE.md
+        echo "✓ Appended container instructions to .claude/CLAUDE.md"
+    elif [ -f /home/claude/workspace/CLAUDE.md ]; then
+        # Append to root CLAUDE.md if that's where it is
+        echo "" >> /home/claude/workspace/CLAUDE.md
+        cat /opt/claude-container/CLAUDE.md >> /home/claude/workspace/CLAUDE.md
+        echo "✓ Appended container instructions to CLAUDE.md"
     else
-        cp /opt/claude-container/CLAUDE.md /home/claude/workspace/.claude/CLAUDE.md
+        echo "○ No CLAUDE.md found - run /init to create one"
     fi
+    mkdir -p /home/claude/workspace/.claude
     touch "$MARKER"
 fi
 exec "$@"
