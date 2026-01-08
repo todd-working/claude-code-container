@@ -48,13 +48,13 @@ RUN mkdir -p /opt/claude-container
 COPY --chmod=755 <<'SCRIPT' /opt/claude-container/entrypoint.sh
 #!/bin/bash
 
-# Verify mount points are accessible
+# Verify mount points are accessible (output to stderr to not interfere with commands)
 verify_mounts() {
     local failed=false
 
     # Check ~/.claude is writable
     if ! touch ~/.claude/.mount-test 2>/dev/null; then
-        echo "⚠ Warning: ~/.claude is not writable"
+        echo "⚠ Warning: ~/.claude is not writable" >&2
         failed=true
     else
         rm -f ~/.claude/.mount-test
@@ -62,7 +62,7 @@ verify_mounts() {
 
     # Check workspace is writable
     if ! touch /home/claude/workspace/.mount-test 2>/dev/null; then
-        echo "⚠ Warning: /home/claude/workspace is not writable"
+        echo "⚠ Warning: /home/claude/workspace is not writable" >&2
         failed=true
     else
         rm -f /home/claude/workspace/.mount-test
@@ -70,24 +70,24 @@ verify_mounts() {
 
     # Check for CLAUDE.md files (informational)
     if [ -f ~/.claude/CLAUDE.md ]; then
-        echo "✓ Global CLAUDE.md found"
+        echo "✓ Global CLAUDE.md found" >&2
     else
-        echo "○ No global ~/.claude/CLAUDE.md"
+        echo "○ No global ~/.claude/CLAUDE.md" >&2
     fi
 
     if [ -f /home/claude/workspace/CLAUDE.md ]; then
-        echo "✓ Project CLAUDE.md found (root)"
+        echo "✓ Project CLAUDE.md found (root)" >&2
     elif [ -f /home/claude/workspace/.claude/CLAUDE.md ]; then
-        echo "✓ Project CLAUDE.md found (.claude/)"
+        echo "✓ Project CLAUDE.md found (.claude/)" >&2
     else
-        echo "○ No project CLAUDE.md (run /init to create)"
+        echo "○ No project CLAUDE.md (run /init to create)" >&2
     fi
 
     if $failed; then
-        echo ""
-        echo "Mount verification failed. Check your docker run command."
-        echo "Expected: -v \"\$HOME/.claude\":/home/claude/.claude"
-        echo "          -v \"\$PROJECT\":/home/claude/workspace"
+        echo "" >&2
+        echo "Mount verification failed. Check your docker run command." >&2
+        echo "Expected: -v \"\$HOME/.claude\":/home/claude/.claude" >&2
+        echo "          -v \"\$PROJECT\":/home/claude/workspace" >&2
     fi
 }
 verify_mounts
@@ -100,12 +100,12 @@ check_claude_update() {
     # Timeout after 5 seconds to avoid hanging on slow/unreachable registry
     local latest=$(timeout 5 npm show @anthropic-ai/claude-code version 2>/dev/null)
     if [ -n "$installed" ] && [ -n "$latest" ] && [ "$installed" != "$latest" ]; then
-        echo ""
-        echo "╔════════════════════════════════════════════════════════════╗"
-        echo "║  Claude Code update available: $installed → $latest"
-        echo "║  Run 'make update-claude' on host to rebuild image"
-        echo "╚════════════════════════════════════════════════════════════╝"
-        echo ""
+        echo "" >&2
+        echo "╔════════════════════════════════════════════════════════════╗" >&2
+        echo "║  Claude Code update available: $installed → $latest" >&2
+        echo "║  Run 'make update-claude' on host to rebuild image" >&2
+        echo "╚════════════════════════════════════════════════════════════╝" >&2
+        echo "" >&2
     fi
 }
 check_claude_update &
@@ -118,14 +118,14 @@ if [ -f /opt/claude-container/CLAUDE.md ] && [ ! -f "$MARKER" ]; then
         # Append container instructions to existing CLAUDE.md
         echo "" >> /home/claude/workspace/.claude/CLAUDE.md
         cat /opt/claude-container/CLAUDE.md >> /home/claude/workspace/.claude/CLAUDE.md
-        echo "✓ Appended container instructions to .claude/CLAUDE.md"
+        echo "✓ Appended container instructions to .claude/CLAUDE.md" >&2
     elif [ -f /home/claude/workspace/CLAUDE.md ]; then
         # Append to root CLAUDE.md if that's where it is
         echo "" >> /home/claude/workspace/CLAUDE.md
         cat /opt/claude-container/CLAUDE.md >> /home/claude/workspace/CLAUDE.md
-        echo "✓ Appended container instructions to CLAUDE.md"
+        echo "✓ Appended container instructions to CLAUDE.md" >&2
     else
-        echo "○ No CLAUDE.md found - run /init to create one"
+        echo "○ No CLAUDE.md found - run /init to create one" >&2
     fi
     mkdir -p /home/claude/workspace/.claude
     touch "$MARKER"
