@@ -47,8 +47,9 @@ WHAT IT DOES
     Only the project directory and ~/.claude are accessible to the container.
 
 MOUNTS
-    claude-home volume     -> /home/claude          (persistent home, stores .claude.json)
-    ~/.claude              -> /home/claude/.claude  (auth, settings from host)
+    claude-home volume     -> /home/claude            (persistent home, stores .claude.json)
+    ~/.claude              -> /home/claude/.claude    (auth, settings from host)
+    ~/Screenshots          -> /home/claude/Screenshots (read-only)
     <project_path>         -> /home/claude/workspace
 
 ENVIRONMENT
@@ -143,6 +144,7 @@ fi
 echo ""
 echo "Mounts:"
 echo "  ~/.claude → /home/claude/.claude"
+echo "  ~/Screenshots → /home/claude/Screenshots (ro)"
 echo "  $project_path → /home/claude/workspace"
 
 # Check CLAUDE.md files
@@ -197,5 +199,6 @@ docker run -it --rm \
     "${docker_args[@]}" \
     -v claude-home:/home/claude \
     -v "$HOME/.claude":/home/claude/.claude \
+    -v "$HOME/Screenshots":/home/claude/Screenshots:ro \
     -v "$project_path":/home/claude/workspace \
     "$image"
