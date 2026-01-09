@@ -128,19 +128,26 @@ Recommended workflow:
 - Use the container for Claude assistance, linting, and testing
 - Build release binaries on your Mac (code is mounted, so changes sync automatically)
 
-## Persistent Caches
+## Persistent Storage
 
-Each language image mounts volumes for caches and installed tools:
+### Home Directory Volume
+
+A `claude-home` volume is mounted at `/home/claude` to persist Claude Code's onboarding state (theme, login) across container runs. Without this, you'd have to complete setup every time.
+
+Your host's `~/.claude` directory is bind-mounted on top at `/home/claude/.claude`, so credentials and settings sync from your machine.
+
+### Language Caches
+
+Each language image mounts additional volumes for caches and installed tools:
 
 | Image | Volumes |
 |-------|---------|
+| All | `claude-home` (home directory, onboarding state) |
 | Go | `claude-go-cache` (modules), `claude-go-bin` (installed tools) |
 | Rust | `claude-cargo-registry`, `claude-cargo-git`, `claude-cargo-bin` (installed tools) |
 | Python | `claude-uv-cache` (packages), `claude-python-bin` (installed tools) |
 
 Tools installed via `go install`, `cargo install`, or `uv tool install` persist across sessions.
-
-Additionally, your host's `~/.claude` directory is bind-mounted for bidirectional sync of authentication and settings.
 
 ## Uninstall
 
