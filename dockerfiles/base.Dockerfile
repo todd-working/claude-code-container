@@ -86,7 +86,8 @@ verify_mounts() {
     if $failed; then
         echo "" >&2
         echo "Mount verification failed. Check your docker run command." >&2
-        echo "Expected: -v \"\$HOME/.claude\":/home/claude/.claude" >&2
+        echo "Expected: -v claude-home:/home/claude" >&2
+        echo "          -v \"\$HOME/.claude\":/home/claude/.claude" >&2
         echo "          -v \"\$PROJECT\":/home/claude/workspace" >&2
     fi
 }
