@@ -47,7 +47,8 @@ WHAT IT DOES
     Only the project directory and ~/.claude are accessible to the container.
 
 MOUNTS
-    ~/.claude              -> /home/claude/.claude  (auth, settings)
+    claude-home volume     -> /home/claude          (persistent home, stores .claude.json)
+    ~/.claude              -> /home/claude/.claude  (auth, settings from host)
     <project_path>         -> /home/claude/workspace
 
 ENVIRONMENT
@@ -183,12 +184,18 @@ fi
 # RUN CONTAINER
 # ============================================================
 
+# Volume mount order matters:
+# 1. claude-home volume provides persistent home directory (for .claude.json, etc.)
+# 2. ~/.claude bind mount overlays credentials/settings from host
+# 3. workspace bind mount overlays the project directory
+
 docker run -it --rm \
     --user "$(id -u):$(id -g)" \
     --name "claude-$project_name" \
     -e HOME=/home/claude \
     -e TERM=xterm-256color \
     "${docker_args[@]}" \
+    -v claude-home:/home/claude \
     -v "$HOME/.claude":/home/claude/.claude \
     -v "$project_path":/home/claude/workspace \
     "$image"
