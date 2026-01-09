@@ -64,7 +64,7 @@ update-all: update-go update-rust update-python
 
 uninstall:
 	docker rmi $(BASE_IMAGE) $(GO_IMAGE) $(RUST_IMAGE) $(PYTHON_IMAGE) 2>/dev/null || true
-	docker volume rm claude-cargo-registry claude-cargo-git claude-cargo-bin claude-go-cache claude-go-bin claude-uv-cache claude-python-bin 2>/dev/null || true
+	docker volume rm claude-home claude-cargo-registry claude-cargo-git claude-cargo-bin claude-go-cache claude-go-bin claude-uv-cache claude-python-bin 2>/dev/null || true
 	rm -f $(HOME)/.claude/bin/claude-sandbox
 	@echo "Removed: Docker images, volumes, and ~/.claude/bin/claude-sandbox"
 	@echo "Note: PATH entry in shell rc file can be removed manually if desired"
